@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Шаштаразға жазылу</title>
+<meta name="theme-color" content="#0e0f12">
+<meta name="color-scheme" content="dark">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+:root {
+  --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --bg: #0e0f12; --surface: #17181c; --surface2: #22242a; --fg: #ececec; --muted: #a6a8b0; --line: #2a2c33;
+  --gold: #d4af37; --on-gold: #1a1500; --gold-soft: #3a3115; --gold-text: #f3dd8a; --wa: #25d366; --on-wa: #07210f; --danger: #ff6b6b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-body);
+  padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(40px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+[hidden] { display: none !important; }
+main { max-width: 480px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { margin: 0; font: 700 28px/1.15 var(--font-display); color: var(--gold); letter-spacing: -.01em; text-wrap: balance; }
+.sub { margin: 4px 0 0; color: var(--muted); }
+.box { background: var(--surface); border-radius: 20px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.lbl { font-size: 13px; color: var(--muted); font-weight: 500; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: transparent; font: inherit; color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--gold-soft); color: var(--gold-text); border-color: var(--gold); }
+.strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+.strip::-webkit-scrollbar { display: none; }
+.day { flex: none; border: 0; border-radius: 16px; background: var(--surface2); color: var(--fg); padding: 10px 14px; text-align: center; min-width: 58px; font: inherit; cursor: pointer; }
+.day small { display: block; font-size: 12px; color: var(--muted); }
+.day strong { font: 700 18px var(--font-display); }
+.day[aria-pressed="true"] { background: var(--gold); color: var(--on-gold); }
+.day[aria-pressed="true"] small { color: var(--on-gold); }
+input[type="text"], input[type="tel"] { width: 100%; min-height: 48px; background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; font: 16px var(--font-body); color: var(--fg); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.send { display: flex; align-items: center; justify-content: center; min-height: 54px; border-radius: 16px; background: var(--wa); color: var(--on-wa); font: 700 17px var(--font-display); text-decoration: none; }
+.send[aria-disabled="true"] { opacity: .4; pointer-events: none; }
+.preview { white-space: pre-wrap; background: var(--surface2); border-radius: 12px; padding: 12px; font-size: 14px; color: var(--muted); }
+.warn { background: #3a1f1f; color: var(--danger); border-radius: 14px; padding: 12px 14px; font-size: 14px; }
+.note { margin: 0; font-size: 12px; color: var(--muted); }
+.err { background: #3a1f1f; color: var(--danger); border-radius: 14px; padding: 12px 14px; font-size: 14px; }
+.ok { background: #1c3a26; color: #9be3b0; border-radius: 14px; padding: 16px; font-size: 16px; }
+.btn { display: flex; align-items: center; justify-content: center; min-height: 54px; border: 0; border-radius: 16px; background: var(--gold); color: var(--on-gold); font: 700 17px var(--font-display); cursor: pointer; width: 100%; }
+.btn:disabled { opacity: .4; cursor: default; }
+.chip.off { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Шаштаразға жазылу</h1>
+    <p class="sub">Бос күн мен уақытты таңдаңыз, атыңыз бен нөміріңізді жазыңыз. Жазылу бірден тіркеледі.</p>
+  </header>
+
+  <div class="err" id="warn" hidden></div>
+  <div class="ok" id="done" hidden></div>
+
+  <div id="form" class="main-form" style="display:grid;gap:16px">
+    <section class="box">
+      <div class="lbl">Күні</div>
+      <div class="strip" id="days"></div>
+      <div class="lbl">Бос уақыт</div>
+      <div class="chips" id="times"></div>
+      <p class="note" id="empty" hidden>Бұл күні бос уақыт жоқ. Басқа күнді таңдаңыз.</p>
+    </section>
+
+    <section class="box">
+      <label class="lbl" style="display:grid;gap:6px">Атыңыз
+        <input type="text" id="name" autocomplete="name" placeholder="Мысалы, Нұрлан" maxlength="50">
+      </label>
+      <label class="lbl" style="display:grid;gap:6px">Телефон (WhatsApp)
+        <input type="tel" id="phone" autocomplete="tel" placeholder="8 777 123 45 67" maxlength="20">
+      </label>
+      <button class="btn" id="go" disabled>Жазылу</button>
+      <p class="note">Келе алмасаңыз, алдын ала шаштаразға хабарлаңыз.</p>
+    </section>
+  </div>
+</main>
+
+<script>
+/* ===== БАПТАУ: тек осы бөлікті өзгертіңіз ===== */
+var FB_PROJECT = "barber-d1171";   // Firebase projectId
+var FB_KEY = "AIzaSyD2062z15S1jj92gtjEHgzHKHNcTuMAWoI";          // Firebase apiKey (құпия емес)
+var SHOP_NAME = "Шаштараз";      // бет тақырыбы
+/* ============================================== */
+
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+  var WD = ["жс", "дс", "сс", "ср", "бс", "жм", "сб"];
+  var WDF = ["жексенбі", "дүйсенбі", "сейсенбі", "сәрсенбі", "бейсенбі", "жұма", "сенбі"];
+  var MF = ["қаңтар", "ақпан", "наурыз", "сәуір", "мамыр", "маусым", "шілде", "тамыз", "қыркүйек", "қазан", "қараша", "желтоқсан"];
+  var BASE = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT + "/databases/(default)/documents";
+  var st = { slots: {}, day: null, time: "" };
+
+  document.title = "Жазылу · " + SHOP_NAME;
+  $("title").textContent = SHOP_NAME + ": жазылу";
+
+  function fail(msg) { var w = $("warn"); w.textContent = msg; w.hidden = !msg; }
+  function key(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+
+  function load() {
+    if (!FB_PROJECT) { fail("Бет әлі бапталмаған (Firebase деректері жоқ)."); return; }
+    fetch(BASE + "/slots?pageSize=100&key=" + FB_KEY).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.error) throw new Error(j.error.message);
+      st.slots = {};
+      (j.documents || []).forEach(function (d) {
+        var id = d.name.split("/").pop();
+        var v = (d.fields && d.fields.free && d.fields.free.arrayValue && d.fields.free.arrayValue.values) || [];
+        st.slots[id] = v.map(function (x) { return x.stringValue; });
+      });
+      fail("");
+      drawDays();
+    }).catch(function () { fail("Бос уақыттарды жүктеу мүмкін болмады. Интернетті тексеріп, бетті жаңартыңыз."); });
+  }
+
+  function drawDays() {
+    var box = $("days"); box.innerHTML = "";
+    var today = new Date(), first = null;
+    for (var i = 0; i < 30; i++) {
+      var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+      var k = key(d), n = (st.slots[k] || []).length;
+      if (!n) continue;
+      if (!first) first = k;
+      var b = document.createElement("button");
+      b.className = "day"; b.type = "button"; b.dataset.k = k;
+      b.setAttribute("aria-pressed", String(st.day === k));
+      b.innerHTML = "<small>" + WD[d.getDay()] + "</small><strong>" + d.getDate() + "</strong><small>" + MF[d.getMonth()].slice(0, 3) + "</small>";
+      b.onclick = function () { st.day = this.dataset.k; st.time = ""; drawDays(); };
+      box.appendChild(b);
+    }
+    if (!first) { $("times").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = "Қазір бос уақыт жоқ. Кейінірек қайта кіріңіз."; update(); return; }
+    if (!st.day || !(st.slots[st.day] || []).length) st.day = first;
+    Array.prototype.forEach.call(box.children, function (c) { c.setAttribute("aria-pressed", String(c.dataset.k === st.day)); });
+    drawTimes();
+  }
+
+  function drawTimes() {
+    var box = $("times"); box.innerHTML = "";
+    var list = (st.slots[st.day] || []);
+    $("empty").hidden = list.length > 0;
+    list.forEach(function (t) {
+      var b = document.createElement("button");
+      b.className = "chip"; b.type = "button"; b.textContent = t;
+      b.setAttribute("aria-pressed", String(st.time === t));
+      b.onclick = function () { st.time = t; drawTimes(); };
+      box.appendChild(b);
+    });
+    update();
+  }
+
+  function digits(s) { return (s || "").replace(/\D/g, ""); }
+  function update() {
+    var ph = digits($("phone").value);
+    $("go").disabled = !(st.day && st.time && $("name").value.trim().length >= 2 && ph.length >= 10);
+  }
+  $("name").oninput = update; $("phone").oninput = update;
+
+  $("go").onclick = function () {
+    var btn = this; btn.disabled = true; fail("");
+    var d = st.day, t = st.time, name = $("name").value.trim(), phone = digits($("phone").value);
+    var id = d + "_" + t.replace(":", "");
+    var body = { fields: {
+      name: { stringValue: name }, phone: { stringValue: phone },
+      date: { stringValue: d }, time: { stringValue: t },
+      status: { stringValue: "new" }, created: { integerValue: String(Date.now()) }
+    } };
+    fetch(BASE + "/bookings?documentId=" + id + "&key=" + FB_KEY, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+    }).then(function (r) {
+      if (r.ok) {
+        var dt = new Date(d + "T00:00:00");
+        $("done").hidden = false;
+        $("done").textContent = "Жазылдыңыз ✓ " + dt.getDate() + " " + MF[dt.getMonth()] + ", " + WDF[dt.getDay()] + ", " + t + ". Күтеміз!";
+        $("form").style.display = "none";
+        window.scrollTo(0, 0);
+      } else {
+        fail("Бұл уақыт енді бос емес. Басқа уақытты таңдаңыз.");
+        st.time = ""; load();
+      }
+    }).catch(function () { fail("Жіберу мүмкін болмады. Интернетті тексеріп, қайталаңыз."); btn.disabled = false; });
+  };
+
+  load();
+})();
+</script>
+</body>
+</html>
