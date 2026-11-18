@@ -47,6 +47,14 @@ input[type="text"], input[type="tel"] { width: 100%; min-height: 48px; backgroun
 .btn { display: flex; align-items: center; justify-content: center; min-height: 54px; border: 0; border-radius: 16px; background: var(--gold); color: var(--on-gold); font: 700 17px var(--font-display); cursor: pointer; width: 100%; }
 .btn:disabled { opacity: .4; cursor: default; }
 .chip.off { display: none; }
+.person { display: grid; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--surface2); }
+.prow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.link { background: none; border: 0; color: var(--gold-text); font: inherit; cursor: pointer; padding: 6px 0; text-align: left; }
+.rm { margin-left: auto; background: none; border: 0; color: var(--muted); font: inherit; cursor: pointer; min-height: 40px; padding: 0 8px; }
+.total { background: var(--gold-soft); color: var(--gold-text); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.red { color: #ff4d4d; font-weight: 700; font-size: 15px; background: #3a1f1f; border-radius: 14px; padding: 12px 14px; margin: 0; }
+.info { display: grid; gap: 6px; font-size: 14px; }
+.info a { color: var(--gold-text); }
 </style>
 </head>
 <body>
@@ -56,10 +64,21 @@ input[type="text"], input[type="tel"] { width: 100%; min-height: 48px; backgroun
     <p class="sub">Бос күн мен уақытты таңдаңыз, атыңыз бен нөміріңізді жазыңыз. Жазылу бірден тіркеледі.</p>
   </header>
 
+  <p class="red">Келе алмайтын болсаңыз, шеберге алдын ала хабарласыңыз!</p>
+
   <div class="err" id="warn" hidden></div>
   <div class="ok" id="done" hidden></div>
 
   <div id="form" class="main-form" style="display:grid;gap:16px">
+    <section class="box">
+      <div class="lbl">Кім келеді?</div>
+      <div id="persons" style="display:grid;gap:8px"></div>
+      <button class="link" id="addp" type="button">+ Тағы адам қосу</button>
+      <div class="lbl">Төлем түрі (салонда төленеді)</div>
+      <div class="chips" id="pay"></div>
+      <div class="total" id="total"></div>
+    </section>
+
     <section class="box">
       <div class="lbl">Күні</div>
       <div class="strip" id="days"></div>
@@ -76,16 +95,27 @@ input[type="text"], input[type="tel"] { width: 100%; min-height: 48px; backgroun
         <input type="tel" id="phone" autocomplete="tel" placeholder="8 777 123 45 67" maxlength="20">
       </label>
       <button class="btn" id="go" disabled>Жазылу</button>
-      <p class="note">Келе алмасаңыз, алдын ала шаштаразға хабарлаңыз.</p>
+      <p class="red">Келе алмайтын болсаңыз, шеберге алдын ала хабарласыңыз!</p>
     </section>
   </div>
+  <section class="box info">
+    <div>📍 <span id="addr"></span> · <a id="map" target="_blank" rel="noopener">2GIS картасынан ашу</a></div>
+    <div>📞 <span id="master"></span>: <a id="tel"></a> · <a id="wa" target="_blank" rel="noopener">WhatsApp</a></div>
+      </section>
 </main>
 
 <script>
 /* ===== БАПТАУ: тек осы бөлікті өзгертіңіз ===== */
 var FB_PROJECT = "barber-d1171";   // Firebase projectId
 var FB_KEY = "AIzaSyD2062z15S1jj92gtjEHgzHKHNcTuMAWoI";          // Firebase apiKey (құпия емес)
-var SHOP_NAME = "Шаштараз";      // бет тақырыбы
+var SHOP_NAME = "Saltanat space";      // бет тақырыбы
+var ADDRESS = "Астана 5/1, «Saltanat space» салоны";
+var MASTER = "Даурен";
+var PHONE = "+77082761993";
+var PRICES = { A: { cash: 4000, card: 4500 }, C: { cash: 3000, card: 3500 } };   // A = ересек, C = бала
+var CHILD_AGE = 13;                 // балаға жас шегі
+var MAX_PERSONS = 3;
+var MAP_URL = "https://2gis.kz/uralsk/geo/70000001040765501";
 /* ============================================== */
 
 (function () {
@@ -95,11 +125,75 @@ var SHOP_NAME = "Шаштараз";      // бет тақырыбы
   var WDF = ["жексенбі", "дүйсенбі", "сейсенбі", "сәрсенбі", "бейсенбі", "жұма", "сенбі"];
   var MF = ["қаңтар", "ақпан", "наурыз", "сәуір", "мамыр", "маусым", "шілде", "тамыз", "қыркүйек", "қазан", "қараша", "желтоқсан"];
   var BASE = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT + "/databases/(default)/documents";
-  var st = { slots: {}, day: null, time: "" };
+  var st = { slots: {}, day: null, time: "", persons: ["A"], pay: "cash" };
 
   document.title = "Жазылу · " + SHOP_NAME;
   $("title").textContent = SHOP_NAME + ": жазылу";
 
+  function money(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0") + "\u00a0₸"; }
+  function sums() {
+    var c = 0, k = 0;
+    st.persons.forEach(function (p) { c += PRICES[p].cash; k += PRICES[p].card; });
+    return { cash: c, card: k };
+  }
+  function drawInfo() {
+    $("addr").textContent = ADDRESS;
+    $("map").href = MAP_URL;
+    $("master").textContent = MASTER;
+    $("tel").textContent = PHONE; $("tel").href = "tel:" + PHONE;
+    $("wa").href = "https://wa.me/" + digits(PHONE);
+  }
+  function drawPersons() {
+    var box = $("persons"); box.innerHTML = "";
+    st.persons.forEach(function (p, i) {
+      var row = document.createElement("div"); row.className = "person";
+      var head = document.createElement("div"); head.className = "prow";
+      var lb = document.createElement("div"); lb.className = "lbl"; lb.textContent = st.persons.length > 1 ? (i + 1) + "-адам" : "Келетін адам";
+      head.appendChild(lb);
+      if (i > 0) {
+        var rm = document.createElement("button"); rm.type = "button"; rm.className = "rm"; rm.textContent = "Өшіру";
+        rm.onclick = function () { st.persons.splice(i, 1); st.time = ""; drawPersons(); };
+        head.appendChild(rm);
+      }
+      var pr = document.createElement("div"); pr.className = "lbl"; pr.style.color = "var(--gold-text)";
+      pr.textContent = money(PRICES[p][st.pay]);
+      head.appendChild(pr);
+      row.appendChild(head);
+      var chips = document.createElement("div"); chips.className = "chips";
+      [["A", "Ересек"], ["C", "Бала (" + CHILD_AGE + " жасқа дейін)"]].forEach(function (o) {
+        var b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = o[1];
+        b.setAttribute("aria-pressed", String(p === o[0]));
+        b.onclick = function () { st.persons[i] = o[0]; drawPersons(); };
+        chips.appendChild(b);
+      });
+      row.appendChild(chips); box.appendChild(row);
+    });
+    $("addp").hidden = st.persons.length >= MAX_PERSONS;
+    var s2 = sums();
+    $("total").textContent = (st.pay === "card" ? "Kaspi: " : "Қолма-қол: ") + money(st.pay === "card" ? s2.card : s2.cash) + (st.persons.length > 1 ? " (" + st.persons.length + " адам)" : "");
+    if (st.day) drawDays(); else update();
+  }
+  function drawPay() {
+    var box = $("pay"); box.innerHTML = "";
+    [["cash", "Қолма-қол"], ["card", "Kaspi"]].forEach(function (o) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = o[1];
+      b.setAttribute("aria-pressed", String(st.pay === o[0]));
+      b.onclick = function () { st.pay = o[0]; drawPay(); drawPersons(); };
+      box.appendChild(b);
+    });
+  }
+  function hm(t, add) {
+    var p = t.split(":"), m = parseInt(p[0], 10) * 60 + parseInt(p[1], 10) + add;
+    return pad(Math.floor(m / 60)) + ":" + pad(m % 60);
+  }
+  /* Бірнеше адам болса, қатар тұрған бос слоттар керек */
+  function startsFor(list) {
+    var set = {}; list.forEach(function (t) { set[t] = 1; });
+    return list.filter(function (t) {
+      for (var k = 1; k < st.persons.length; k++) if (!set[hm(t, 30 * k)]) return false;
+      return true;
+    });
+  }
   function fail(msg) { var w = $("warn"); w.textContent = msg; w.hidden = !msg; }
   function key(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
 
@@ -111,6 +205,7 @@ var SHOP_NAME = "Шаштараз";      // бет тақырыбы
       (j.documents || []).forEach(function (d) {
         var id = d.name.split("/").pop();
         var v = (d.fields && d.fields.free && d.fields.free.arrayValue && d.fields.free.arrayValue.values) || [];
+        if (id.charAt(0) === "_") return;
         st.slots[id] = v.map(function (x) { return x.stringValue; });
       });
       fail("");
@@ -123,7 +218,7 @@ var SHOP_NAME = "Шаштараз";      // бет тақырыбы
     var today = new Date(), first = null;
     for (var i = 0; i < 30; i++) {
       var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-      var k = key(d), n = (st.slots[k] || []).length;
+      var k = key(d), n = startsFor(st.slots[k] || []).length;
       if (!n) continue;
       if (!first) first = k;
       var b = document.createElement("button");
@@ -134,14 +229,14 @@ var SHOP_NAME = "Шаштараз";      // бет тақырыбы
       box.appendChild(b);
     }
     if (!first) { $("times").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = "Қазір бос уақыт жоқ. Кейінірек қайта кіріңіз."; update(); return; }
-    if (!st.day || !(st.slots[st.day] || []).length) st.day = first;
+    if (!st.day || !startsFor(st.slots[st.day] || []).length) st.day = first;
     Array.prototype.forEach.call(box.children, function (c) { c.setAttribute("aria-pressed", String(c.dataset.k === st.day)); });
     drawTimes();
   }
 
   function drawTimes() {
     var box = $("times"); box.innerHTML = "";
-    var list = (st.slots[st.day] || []);
+    var list = startsFor(st.slots[st.day] || []);
     $("empty").hidden = list.length > 0;
     list.forEach(function (t) {
       var b = document.createElement("button");
@@ -167,7 +262,8 @@ var SHOP_NAME = "Шаштараз";      // бет тақырыбы
     var body = { fields: {
       name: { stringValue: name }, phone: { stringValue: phone },
       date: { stringValue: d }, time: { stringValue: t },
-      status: { stringValue: "new" }, created: { integerValue: String(Date.now()) }
+      status: { stringValue: "new" }, created: { integerValue: String(Date.now()) },
+      persons: { stringValue: st.persons.join("") }, pay: { stringValue: st.pay }
     } };
     fetch(BASE + "/bookings?documentId=" + id + "&key=" + FB_KEY, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
@@ -175,7 +271,8 @@ var SHOP_NAME = "Шаштараз";      // бет тақырыбы
       if (r.ok) {
         var dt = new Date(d + "T00:00:00");
         $("done").hidden = false;
-        $("done").textContent = "Жазылдыңыз ✓ " + dt.getDate() + " " + MF[dt.getMonth()] + ", " + WDF[dt.getDay()] + ", " + t + ". Күтеміз!";
+        var sm = sums();
+        $("done").innerHTML = "Жазылдыңыз ✓<br>" + dt.getDate() + " " + MF[dt.getMonth()] + ", " + WDF[dt.getDay()] + ", " + t + " (" + st.persons.length * 30 + " мин)<br>Төлем: " + money(st.pay === "card" ? sm.card : sm.cash) + (st.pay === "card" ? " Kaspi" : " қолма-қол") + "<br>📍 " + ADDRESS + "<br><br><span class='red' style='display:block'>Келе алмайтын болсаңыз, шеберге алдын ала хабарласыңыз: " + MASTER + " " + PHONE + "</span>";
         $("form").style.display = "none";
         window.scrollTo(0, 0);
       } else {
@@ -185,6 +282,8 @@ var SHOP_NAME = "Шаштараз";      // бет тақырыбы
     }).catch(function () { fail("Жіберу мүмкін болмады. Интернетті тексеріп, қайталаңыз."); btn.disabled = false; });
   };
 
+  drawInfo(); drawPay(); drawPersons();
+  $("addp").onclick = function () { if (st.persons.length < MAX_PERSONS) { st.persons.push("C"); st.time = ""; drawPersons(); } };
   load();
 })();
 </script>
