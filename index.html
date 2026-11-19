@@ -260,8 +260,10 @@ $("done").innerHTML = t.ok + "<br>" + dt.getDate() + " " + t.MF[dt.getMonth()] +
 "<br>" + t.pay + money(sums()) + (st.pay === "card" ? t.inCard : t.inCash) + "<br>📍 " + t.addr + "<br><br><span class='red' style='display:block'>" + t.cant + MASTER + " " + PHONE + "</span>";
 $("form").style.display = "none";
 window.scrollTo(0, 0);
+} else if (r.status === 409) {
+fail(t.taken); st.time = ""; load(); window.scrollTo(0, 0);
 } else {
-fail(t.taken); st.time = ""; load();
+fail(t.sendf + " (" + r.status + ")"); btn.disabled = false; window.scrollTo(0, 0);
 }
 }).catch(function () { fail(t.sendf); btn.disabled = false; });
 };
